@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Set the Vagrant box name
+BOX_NAME=demo-ops
+
+# Check if the box already exists
+if vagrant box list | grep -q "${BOX_NAME}"; then
+  echo "Box ${BOX_NAME} already exists."
+  exit 0
+fi
+
+# Create a new Vagrant box
+vagrant box add "${BOX_NAME}" ubuntu/bionic64
+
+# Update the box to the latest version
+vagrant box update "${BOX_NAME}"
