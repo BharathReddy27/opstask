@@ -91,18 +91,18 @@
         - name: Configure Prometheus
           template:
             src: prometheus.yaml.j2
-            dest: /etc/prometheus/prometheus.yml
+            dest: prometheus.yml
             owner: prometheus
             group: prometheus
             mode: 0644
 
-        - name: Configure Grafana
-          template:
-            src: grafana.ini.j2
-            dest: /etc/grafana/grafana.ini
-            owner: grafana
-            group: grafana
-            mode: 0644
+       # - name: Configure Grafana
+       #  template:
+       #     src: grafana.ini.j2
+       #     dest: /etc/grafana/grafana.ini
+       #     owner: grafana
+       #     group: grafana
+       #    mode: 0644
 
         - name: Start Prometheus and Grafana services
           service:
