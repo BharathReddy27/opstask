@@ -1,0 +1,128 @@
+---
+- hosts: all
+  become: yes
+  tasks:
+    - name: Set hostname
+      hostname:
+        name: demo-ops
+
+    - name: Create user demo
+      user:
+        name: demo
+        state: present
+        groups: sudo
+
+    - name: Harden security
+      tasks:
+        - name: Disable root login
+          pam_policy:
+            name: password-auth
+            rule: pam_succeed_ok
+            auth: pam_unix.so nullok_secure
+            auth_optional: pam_unix.so nullok_secure
+            options: sha512 shadow
+
+        - name: Install UFW firewall
+          apt:
+            name: ufw
+            state: present
+
+        - name: Allow specific ports in UFW firewall
+          ufw:
+            rule: allow
+            port: 80
+            proto: tcp
+
+        - name: Allow specific ports in UFW firewall
+          ufw:
+            rule: allow
+            port: 443
+            proto: tcp
+
+        - name: Allow specific ports in UFW firewall
+          ufw:
+            rule: allow
+            port: 22
+            proto: tcp
+
+        - name: Configure sysctl for sane defaults
+          sysctl:
+            name: "{{ item.key }}"
+            value: "{{ item.value }}"
+            sysctl_set: yes
+            reload: yes
+          with_items:
+            - { key: "fs.file-max", value: 65536 }
+            - { key: "net.core.somaxconn", value: 65536 }
+            - { key: "vm.max_map_count", value: 262144 }
+
+    - name: Set timezone to Asia/Kolkata
+      timezone:
+        name: Asia/Kolkata
+
+    - name: Install Docker and Docker-Compose
+      apt:
+        name:
+          - docker.io
+          - docker-compose
+        state: present
+
+    - name: Configure Docker Daemon to have sane defaults
+      replace:
+        path: /etc/docker/daemon.json
+        regexp: '("log-driver": "json-file", "max-size": "10m")'
+        replace: '("log-driver": "json-file", "max-size": "50m")'
+        backup: yes
+
+    - name: Deploy docker-compose.yml in /etc/demo-ops and start the services
+      docker_compose:
+        path: /etc/demo-ops/docker-compose.yml
+        state: started
+
+    - name: Install and configure Prometheus and Grafana
+      block:
+        - name: Install Prometheus and Grafana
+          apt:
+            name:
+              - prometheus
+              - grafana
+            state: present
+
+        - name: Configure Prometheus
+          template:
+            src: prometheus.yaml.j2
+            dest: /etc/prometheus/prometheus.yml
+            owner: prometheus
+            group: prometheus
+            mode: 0644
+
+        - name: Configure Grafana
+          template:
+            src: grafana.ini.j2
+            dest: /etc/grafana/grafana.ini
+            owner: grafana
+            group: grafana
+            mode: 0644
+
+        - name: Start Prometheus and Grafana services
+          service:
+            name:
+              - prometheus
+              - grafana
+            state: started
+            enabled: yes
+
+        - name: Ensure app and redis metrics are being scraped
+          replace:
+            path: /etc/prometheus/prometheus.yml
+            regexp: '#.*scrape_configs:.*'
+            replace: |
+              scrape_configs:
+              - job_name: app
+                static_configs:
+                - targets: ["localhost:9100"]
+              - job_name: redis
+                static_configs:
+                - targets: ["localhost:6379"]
+
+        when: monitoring|default(false)
